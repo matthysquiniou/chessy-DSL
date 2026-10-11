@@ -1,0 +1,161 @@
+func Evaluate() : I32 {
+    I32 score = 0;
+    score = score + PopCount(Pieces(PieceWhitePawn()))   * 100;
+    score = score + PopCount(Pieces(PieceWhiteKnight())) * 320;
+    score = score + PopCount(Pieces(PieceWhiteBishop())) * 330;
+    score = score + PopCount(Pieces(PieceWhiteRook()))   * 500;
+    score = score + PopCount(Pieces(PieceWhiteQueen()))  * 900;
+    score = score - PopCount(Pieces(PieceBlackPawn()))   * 100;
+    score = score - PopCount(Pieces(PieceBlackKnight())) * 320;
+    score = score - PopCount(Pieces(PieceBlackBishop())) * 330;
+    score = score - PopCount(Pieces(PieceBlackRook()))   * 500;
+    score = score - PopCount(Pieces(PieceBlackQueen()))  * 900;
+    if (SideToMove() == 0) {
+        return score;
+    }
+    return -score;
+}
+
+func Quiescence(I32 alpha, I32 beta, I32 qDepth) : I32 {
+    I32 standPat = Evaluate();
+
+    if (standPat >= beta) {
+        return beta;
+    }
+    if (standPat > alpha) {
+        alpha = standPat;
+    }
+    if (qDepth >= 4) {
+        return alpha;
+    }
+
+    GenerateCaptures();
+    SortMovesMvvLva();
+
+    I32 moveTotal = MoveCount();
+    if (moveTotal == 0) {
+        return alpha;
+    }
+
+    I32 moveIndex = 0;
+
+    do {
+        Move m = MoveAt(moveIndex);
+        MakeMove(m);
+        I32 score = -Quiescence(-beta, -alpha, qDepth + 1);
+        UnmakeMove();
+
+        if (score >= beta) {
+            return beta;
+        }
+        if (score > alpha) {
+            alpha = score;
+        }
+        moveIndex = moveIndex + 1;
+    } while (moveIndex < moveTotal);
+
+    return alpha;
+}
+
+func AlphaBeta(I32 depth, I32 alpha, I32 beta) : I32 {
+    if (depth == 0) {
+        return Quiescence(alpha, beta, 0);
+    }
+
+    Generate();
+    SortMovesMvvLva();
+    I32 moveTotal = MoveCount();
+
+    if (moveTotal == 0) {
+        if (InCheck(SideToMove())) {
+            return -100000;
+        }
+        return 0;
+    }
+
+    I32 bestScore = -1000000;
+    I32 moveIndex = 0;
+
+    do {
+        Move currentMove = MoveAt(moveIndex);
+        MakeMove(currentMove);
+        I32 score = -AlphaBeta(depth - 1, -beta, -alpha);
+        UnmakeMove();
+
+        if (score > bestScore) {
+            bestScore = score;
+        }
+        if (score > alpha) {
+            alpha = score;
+        }
+        if (alpha >= beta) {
+            moveIndex = moveTotal;
+        }
+        moveIndex = moveIndex + 1;
+    } while (moveIndex < moveTotal);
+
+    return bestScore;
+}
+
+func FindBestMove(I32 depth) : Move {
+    Generate();
+    SortMovesMvvLva();
+    I32 moveTotal = MoveCount();
+    if (moveTotal == 0) {
+        return NullMove();
+    }
+
+    I32 alpha = -1000000;
+    I32 beta = 1000000;
+    I32 bestScore = -1000000;
+    Move bestMove = MoveAt(0);
+    I32 moveIndex = 0;
+
+    do {
+        Move currentMove = MoveAt(moveIndex);
+        MakeMove(currentMove);
+        I32 score = -AlphaBeta(depth - 1, -beta, -alpha);
+        UnmakeMove();
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = currentMove;
+        }
+        if (score > alpha) {
+            alpha = score;
+        }
+        moveIndex = moveIndex + 1;
+    } while (moveIndex < moveTotal);
+
+    return bestMove;
+}
+
+func Main() {
+    NewBoard();
+
+    I32 running = 1;
+    do {
+        PrintBoard();
+
+        I32 choice = ReadInt();
+
+        if (choice == 0) {
+            running = 0;
+        }
+        if (choice == 1) {
+            Move best = FindBestMove(5);
+            Print(best);
+            MakeMove(best);
+        }
+        if (choice == 2) {
+            Move best = FindBestMove(6);
+            Print(best);
+            MakeMove(best);
+        }
+        if (choice == 3) {
+            Move m = ReadMove();
+            Print(m);
+            MakeMove(m);
+        }
+    } while (running == 1);
+}

@@ -1,0 +1,252 @@
+func Evaluate() : I32 {
+    I32 score = 0;
+    score = score + PopCount(Pieces(PieceWhitePawn()))   * 100;
+    score = score + PopCount(Pieces(PieceWhiteKnight())) * 320;
+    score = score + PopCount(Pieces(PieceWhiteBishop())) * 330;
+    score = score + PopCount(Pieces(PieceWhiteRook()))   * 500;
+    score = score + PopCount(Pieces(PieceWhiteQueen()))  * 900;
+    score = score - PopCount(Pieces(PieceBlackPawn()))   * 100;
+    score = score - PopCount(Pieces(PieceBlackKnight())) * 320;
+    score = score - PopCount(Pieces(PieceBlackBishop())) * 330;
+    score = score - PopCount(Pieces(PieceBlackRook()))   * 500;
+    score = score - PopCount(Pieces(PieceBlackQueen()))  * 900;
+    if (SideToMove() == 0) {
+        return score;
+    }
+    return -score;
+}
+
+func EvaluateSIMD() : I32 {
+    I64x4 v1 = VectorBBx4Make(
+        Pieces(PieceWhitePawn()),
+        Pieces(PieceWhiteKnight()),
+        Pieces(PieceWhiteBishop()),
+        Pieces(PieceWhiteRook()));
+
+    I64x4 v2 = VectorBBx4Make(
+        Pieces(PieceWhiteQueen()),
+        Pieces(PieceBlackPawn()),
+        Pieces(PieceBlackKnight()),
+        Pieces(PieceBlackBishop()));
+
+    I64x4 v3 = VectorBBx4Make(
+        Pieces(PieceBlackRook()),
+        Pieces(PieceBlackQueen()),
+        Bit(0),
+        Bit(0));
+
+    I64x4 c1 = PopCountBatch(v1);
+    I64x4 c2 = PopCountBatch(v2);
+    I64x4 c3 = PopCountBatch(v3);
+
+    I32 score = 0;
+    score = score + VectorI64x4GetI32(c1, 0) * 100;   
+    score = score + VectorI64x4GetI32(c1, 1) * 320;   
+    score = score + VectorI64x4GetI32(c1, 2) * 330;   
+    score = score + VectorI64x4GetI32(c1, 3) * 500;   
+    score = score + VectorI64x4GetI32(c2, 0) * 900;   
+    score = score - VectorI64x4GetI32(c2, 1) * 100;   
+    score = score - VectorI64x4GetI32(c2, 2) * 320;   
+    score = score - VectorI64x4GetI32(c2, 3) * 330;   
+    score = score - VectorI64x4GetI32(c3, 0) * 500;  
+    score = score - VectorI64x4GetI32(c3, 1) * 900;  
+
+    if (SideToMove() == 0) { return score; }
+    return -score;
+}
+
+func Quiescence(I32 alpha, I32 beta, I32 qDepth) : I32 {
+    I32 standPat = Evaluate();
+
+    if (standPat >= beta) {
+        return beta;
+    }
+    if (standPat > alpha) {
+        alpha = standPat;
+    }
+    if (qDepth >= 4) {
+        return alpha;
+    }
+
+    GenerateCaptures();
+    SortMovesMvvLva();
+
+    I32 moveTotal = MoveCount();
+    if (moveTotal == 0) {
+        return alpha;
+    }
+
+    I32 moveIndex = 0;
+
+    do {
+        Move m = MoveAt(moveIndex);
+        MakeMove(m);
+        I32 score = -Quiescence(-beta, -alpha, qDepth + 1);
+        UnmakeMove();
+
+        if (score >= beta) {
+            return beta;
+        }
+        if (score > alpha) {
+            alpha = score;
+        }
+        moveIndex = moveIndex + 1;
+    } while (moveIndex < moveTotal);
+
+    return alpha;
+}
+
+func QuiescenceSIMD(I32 alpha, I32 beta, I32 qDepth) : I32 {
+    I32 standPat = EvaluateSIMD();
+    if (standPat >= beta) { return beta; }
+    if (standPat > alpha) { alpha = standPat; }
+    if (qDepth >= 3) { return alpha; }
+
+    GenerateCaptures();
+    SortMovesMvvLva();
+    I32 moveTotal = MoveCount();
+    if (moveTotal == 0) { return alpha; }
+
+    I32 moveIndex = 0;
+    do {
+        Move m = MoveAt(moveIndex);
+        MakeMove(m);
+        I32 score = -QuiescenceSIMD(-beta, -alpha, qDepth + 1);
+        UnmakeMove();
+        if (score >= beta) { return beta; }
+        if (score > alpha) { alpha = score; }
+        moveIndex = moveIndex + 1;
+    } while (moveIndex < moveTotal);
+
+    return alpha;
+}
+
+func AlphaBeta(I32 depth, I32 alpha, I32 beta) : I32 {
+    if (depth == 0) {
+        return Quiescence(alpha, beta, 0);
+    }
+
+    Generate();
+    SortMovesMvvLva();
+    I32 moveTotal = MoveCount();
+
+    if (moveTotal == 0) {
+        if (InCheck(SideToMove())) {
+            return -100000;
+        }
+        return 0;
+    }
+
+    I32 bestScore = -1000000;
+    I32 moveIndex = 0;
+
+    do {
+        Move currentMove = MoveAt(moveIndex);
+        MakeMove(currentMove);
+        I32 score = -AlphaBeta(depth - 1, -beta, -alpha);
+        UnmakeMove();
+
+        if (score > bestScore) {
+            bestScore = score;
+        }
+        if (score > alpha) {
+            alpha = score;
+        }
+        if (alpha >= beta) {
+            moveIndex = moveTotal;
+        }
+        moveIndex = moveIndex + 1;
+    } while (moveIndex < moveTotal);
+
+    return bestScore;
+}
+
+func AlphaBetaSIMD(I32 depth, I32 alpha, I32 beta) : I32 {
+    if (depth == 0) { return QuiescenceSIMD(alpha, beta, 0); }
+
+    Generate();
+    SortMovesMvvLva();
+    I32 moveTotal = MoveCount();
+    if (moveTotal == 0) {
+        if (InCheck(SideToMove())) { return -100000; }
+        return 0;
+    }
+
+    I32 bestScore = -1000000;
+    I32 moveIndex = 0;
+    do {
+        Move m = MoveAt(moveIndex);
+        MakeMove(m);
+        I32 score = -AlphaBetaSIMD(depth - 1, -beta, -alpha);
+        UnmakeMove();
+        if (score > bestScore) { bestScore = score; }
+        if (score > alpha) { alpha = score; }
+        if (alpha >= beta) { moveIndex = moveTotal; }
+        moveIndex = moveIndex + 1;
+    } while (moveIndex < moveTotal);
+
+    return bestScore;
+}
+
+func FindBestMove(I32 depth) : Move {
+    Generate();
+    SortMovesMvvLva();
+    I32 moveTotal = MoveCount();
+    if (moveTotal == 0) {
+        return NullMove();
+    }
+
+    I32 alpha = -1000000;
+    I32 beta = 1000000;
+    I32 bestScore = -1000000;
+    Move bestMove = MoveAt(0);
+    I32 moveIndex = 0;
+
+    do {
+        Move currentMove = MoveAt(moveIndex);
+        MakeMove(currentMove);
+        I32 score = -AlphaBeta(depth - 1, -beta, -alpha);
+        UnmakeMove();
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = currentMove;
+        }
+        if (score > alpha) {
+            alpha = score;
+        }
+        moveIndex = moveIndex + 1;
+    } while (moveIndex < moveTotal);
+
+    return bestMove;
+}
+
+func Main() {
+    I32 iterations = 100;
+    I32 depth = 4;
+
+    NewBoard();
+    I32 totalScalar = 0;
+    I64 t0 = NowMs();
+    I32 i = 0;
+    do {
+        totalScalar = totalScalar + AlphaBeta(depth, -1000000, 1000000);
+        i = i + 1;
+    } while (i < iterations);
+    I64 t1 = NowMs();
+
+    NewBoard();
+    I32 totalSIMD = 0;
+    I64 t2 = NowMs();
+    i = 0;
+    do {
+        totalSIMD = totalSIMD + AlphaBetaSIMD(depth, -1000000, 1000000);
+        i = i + 1;
+    } while (i < iterations);
+    I64 t3 = NowMs();
+
+    Print(totalScalar);
+    Print(totalSIMD);
+    Print(t1 - t0);   
+    Print(t3 - t2);   
+}

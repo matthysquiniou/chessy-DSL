@@ -1,0 +1,21 @@
+func main()
+{
+    I32 tester1 = 5;
+    I32 tester2 = 2;
+
+    // Boolean operations
+    Bool booleans = tester1 == tester2;
+    booleans = tester1 != tester2;
+    booleans = tester1 < tester2;
+    booleans = tester1 <= tester2;
+    booleans = tester1 > tester2;
+    booleans = tester1 >= tester2;
+
+    booleans = true && true;
+    booleans = true && false;
+    booleans = false && false;
+
+    booleans = true || true;
+    booleans = true || false;
+    booleans = false || false;
+}

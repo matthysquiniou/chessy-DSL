@@ -1,0 +1,17 @@
+func main()
+{
+    Bool test_bool = true;
+    I8 test_i8 = 127;
+    I16 test_i16 = 32767;
+    I32 test_i32 = 2147483647;
+    I64 test_i64 = 9223372036854775807;
+    U8 test_u8 = 255;
+    U16 test_u16 = 65535;
+    U32 test_u32 = 4294967295;
+    U64 test_u64 = 18446744073709551615;
+    String test_string = "Hello World !";
+    Bitboard test_bitboard;
+    Square test_square;
+    Piece test_piece;
+    Move test_move;
+}

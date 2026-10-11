@@ -1,0 +1,27 @@
+func Test()
+{
+    return;
+}
+
+func Test_Parameters(I32 a)
+{
+    return;
+}
+
+func Test_Return(): String
+{
+    return "Work";
+}
+
+func Test_Parameters_Return(I32 a) : I32
+{
+    return a;
+}
+
+func main()
+{
+    Test();
+    I32 value = 5;
+    Test_Parameters(value);
+    value = Test_Parameters_Return(value);
+}
